@@ -39,7 +39,10 @@ namespace MF
 			*/
 			void load_t(const char* input, bool checkOrientation = false);
 
-
+			/*!
+			Load tet mesh from a ".geo" file
+			*/
+			void load_geo(const char* input, bool checkOrientation = false);
 
 		protected:
 			TVerticesMat<DType> mVertPos;
@@ -268,6 +271,15 @@ namespace MF
 
 			removeVProp(mVTEArrayHandle);
 
+		}
+
+
+		template <typename DType, typename TVertexType, typename VertexType, typename HalfEdgeType, typename TEdgeType, typename EdgeType, typename HalfFaceType, typename FaceType, typename TetType>
+		void CTMeshStatic<DType, TVertexType, VertexType, HalfEdgeType, TEdgeType, EdgeType, HalfFaceType, FaceType, TetType>::load_geo(const char* input, bool checkOrientation)
+		{
+			std::cout<<"Load Houdini .geo file for tetrahedrons. Not implemented yet!" << std::endl;
+
+			
 		}
 	}
 }
