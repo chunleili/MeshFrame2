@@ -6,6 +6,7 @@
 #include "BaseTMesh.h"
 #include "TetMeshTypeDefs.h"
 #include "../Types/TypeDefs.h"
+#include "HoudiniGeoIO.h"
 
 namespace MF
 {
@@ -277,9 +278,101 @@ namespace MF
 		template <typename DType, typename TVertexType, typename VertexType, typename HalfEdgeType, typename TEdgeType, typename EdgeType, typename HalfFaceType, typename FaceType, typename TetType>
 		void CTMeshStatic<DType, TVertexType, VertexType, HalfEdgeType, TEdgeType, EdgeType, HalfFaceType, FaceType, TetType>::load_geo(const char* input, bool checkOrientation)
 		{
-			std::cout<<"Load Houdini .geo file for tetrahedrons. Not implemented yet!" << std::endl;
-
-			
+			// 已有代码
+			std::string p = input;
+			HoudiniGeoIO geo(p);
+			auto indices = geo.getIndices();
+			auto positions = geo.getPositions();
+		
+			// 1. 添加临时属性
+			addVProp(mVHFArrayHandle);
+			addVProp(mVTEArrayHandle);
+		
+			// 2. 初始化网格参数
+			m_maxVertexId = 0;
+			m_nVertices = positions.size() / 3;  // positions是一维数组，每3个float表示一个顶点
+			m_nTets = indices.size() / 4;        // indices是一维数组，每4个int表示一个四面体
+			m_nEdges = 0;                        // 边数后面计算
+		
+			// 3. 调整矩阵大小
+			mVertPos.resize(3, m_nVertices);
+			mTetVIds.resize(4, m_nTets);
+		
+			// 4. 创建顶点
+			for (int vId = 0; vId < m_nVertices; vId++) {
+				TVec3<DType> p;
+				p[0] = positions[vId * 3];
+				p[1] = positions[vId * 3 + 1];
+				p[2] = positions[vId * 3 + 2];
+		
+				VertexType* v = createVertexWithIndex();
+				v->id() = vId;
+				v->setPVertPos(&mVertPos);
+				v->position() = p;
+			}
+		
+			// 5. 创建四面体
+			for (int tid = 0; tid < m_nTets; tid++) {
+				int vIds[4];
+				for (int k = 0; k < 4; k++) {
+					vIds[k] = indices[tid * 4 + k];
+				}
+		
+				TetType* pT = createTetWithIndex();
+				pT->id() = tid;
+		
+				if (checkOrientation) {
+					_construct_tet_orientation(pT, tid, vIds);
+				}
+				else {
+					_construct_tet(pT, tid, vIds);
+				}
+		
+				mTetVIds.block<4, 1>(0, tid) << vIds[0], vIds[1], vIds[2], vIds[3];
+			}
+		
+			// 6. 构建面和边
+			_construct_faces();
+			_construct_edges();
+			m_nEdges = (int)mEContainer.size();
+		
+			// 7. 设置最大顶点ID
+			for (auto vIter = mVContainer.begin(); vIter != mVContainer.end(); vIter++) {
+				VertexType* pV = *vIter;
+				if (pV->id() > m_maxVertexId) {
+					m_maxVertexId = pV->id();
+				}
+			}
+		
+			// 8. 标记边界面和顶点
+			for (auto fIter = mFContainer.begin(); fIter != mFContainer.end(); ++fIter) {
+				FaceType* pF = *fIter;
+				if (this->FaceLeftHalfFace(pF) == NULL || this->FaceRightHalfFace(pF) == NULL) {
+					pF->boundary() = true;
+					HalfFaceType* pH = 
+						FaceLeftHalfFace(pF) == NULL ? FaceRightHalfFace(pF) : FaceLeftHalfFace(pF);
+					HalfEdgeType* pHE = (HalfEdgeType*)pH->half_edge();
+		
+					for (int i = 0; i < 3; ++i) {
+						EdgeType* pE = HalfEdgeEdge(pHE);
+						int vid = pH->key(i);
+						VertexType* v = idVertex(vid);
+						v->boundary() = true;
+						pE->boundary() = true;
+						pHE = HalfEdgeNext(pHE);
+					}
+				}
+			}
+		
+			// 9. 优化内存
+			for (auto vIter = mVContainer.begin(); vIter != mVContainer.end(); vIter++) {
+				VertexType* pV = *vIter;
+				pV->edges()->shrink_to_fit();
+				pV->tvertices()->shrink_to_fit();
+			}
+		
+			// 10. 移除临时属性
+			removeVProp(mVTEArrayHandle);
 		}
 	}
 }
