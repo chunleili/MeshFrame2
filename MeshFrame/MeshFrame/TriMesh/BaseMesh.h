@@ -789,7 +789,7 @@ namespace MF {
 	/*!
 	The previous halfedge of a halfedge.
 	\param he the input halfedge.
-	\return the next halfedge of he.
+	\return the previous halfedge of he.
 	*/
 	template<typename DType, typename VertexType, typename EdgeType, typename FaceType, typename HalfEdgeType>
 	HalfEdgeType * CMeshBase<DType, VertexType, EdgeType, FaceType, HalfEdgeType>::halfedgePrev(HEPtr pHE)
